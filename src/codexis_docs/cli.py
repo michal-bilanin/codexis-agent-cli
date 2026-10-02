@@ -3,7 +3,10 @@
 import argparse
 import sys
 
-from codexis_docs.config import LANGUAGES
+from codexis_docs.config import LANGUAGES, index_path
+from codexis_docs.index import IndexNotFoundError, Result, search
+
+BOLD = ("\033[1m", "\033[0m")
 
 
 def _positive_int(value: str) -> int:
@@ -44,8 +47,37 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     try:
         args = parser.parse_args(argv)
+        if args.command == "search" and not args.query.split():
+            parser.error("the query contains no words")
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else 2
 
+    if args.command == "search":
+        return _search(args.query, args.lang, args.limit)
     print(f"{args.command}: not implemented", file=sys.stderr)
     return 1
+
+
+def _search(query: str, lang: str, limit: int) -> int:
+    """Print the Results for `query` and return the exit code."""
+    path = index_path()
+    highlight = BOLD if sys.stdout.isatty() else ("", "")
+    try:
+        results = search(path, query, lang, limit, highlight)
+    except IndexNotFoundError:
+        print(
+            f"No index found at {path}. Run 'codexis-docs crawl' first.",
+            file=sys.stderr,
+        )
+        return 1
+    if not results:
+        print(f'No results for "{query}" (lang {lang}).')
+    else:
+        blocks = (_format(n, result) for n, result in enumerate(results, start=1))
+        print("\n\n".join(blocks))
+    return 0
+
+
+def _format(number: int, result: Result) -> str:
+    """Render one Result as its numbered Title, then URL and Snippet indented."""
+    return f"{number}. {result.title}\n   {result.url}\n   {result.snippet}"
