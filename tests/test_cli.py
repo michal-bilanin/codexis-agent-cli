@@ -131,6 +131,16 @@ def test_search_without_results_succeeds(index, capsys):
     assert captured.err == ""
 
 
-def test_crawl_is_not_implemented(capsys):
-    assert main(["crawl"]) == 1
-    assert "not implemented" in capsys.readouterr().err
+def test_snippet_spanning_main_text_lines_is_printed_on_one_line(home, capsys):
+    build_index(
+        index_path(),
+        [(UPLOAD_URL, "cs", "Soubory", "První odstavec o souborech.\nDruhý odstavec.")],
+    )
+
+    assert main(["search", "soubor", "--lang", "cs"]) == 0
+
+    assert capsys.readouterr().out.splitlines() == [
+        "1. Soubory",
+        f"   {UPLOAD_URL}",
+        "   První odstavec o souborech. Druhý odstavec.",
+    ]
